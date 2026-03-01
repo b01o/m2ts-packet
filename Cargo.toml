@@ -1,7 +1,14 @@
 [package]
 name = "ts-packet"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
+authors     = ["b01o <b01o@proton.me>"]
+repository  = "https://github.com/b01o/ts-packet"
+license     = "MIT"
+description = "A Simple MPEG2 Transport Stream (TS) packet decoder."
+
+keywords = ["mpeg2", "ts", "mpeg2ts", "decoder", "parser"]
+categories = ["multimedia::encoding"]
 
 [dependencies]
 bitfield-struct = "0.12.1"
@@ -12,6 +19,3 @@ tokio-util = { version = "0.7.18", features = ["codec"] }
 
 [dev-dependencies]
 tokio = { version = "1.28.0", features = ["full"] }
-
-
-
