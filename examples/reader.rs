@@ -12,8 +12,8 @@ async fn main() {
     )
     .await
     .unwrap();
-    let ts_packets = FramedRead::new(&mut file, ts_packet::TsPacketDecoder);
-    let mut unpack = ts_packet::UnpackedDecoder::new(ts_packets);
+    let ts_packets = FramedRead::new(&mut file, m2ts_packet::TsPacketDecoder);
+    let mut unpack = m2ts_packet::UnpackedDecoder::new(ts_packets);
     let mut count = 0;
     while let Some(unpacked) = unpack.try_next().await.unwrap() {
         println!("Packet {count}: {:?}", unpacked);

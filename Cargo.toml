@@ -1,9 +1,9 @@
 [package]
-name = "ts-packet"
+name = "m2ts-packet"
 version = "0.0.1"
 edition = "2024"
 authors     = ["b01o <b01o@proton.me>"]
-repository  = "https://github.com/b01o/ts-packet"
+repository  = "https://github.com/b01o/m2ts-packet"
 license     = "MIT"
 description = "A Simple MPEG2 Transport Stream (TS) packet decoder."
 
