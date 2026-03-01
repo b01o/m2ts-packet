@@ -1,4 +1,5 @@
-use bitfield_struct::{bitenum, bitfield};
+use crate::*;
+
 #[bitfield(u32, order = Msb)]
 pub struct TransportStreamHeader {
     #[bits(8, default = 0x47, access = RO)]
