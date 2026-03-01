@@ -24,12 +24,14 @@ const NULL_PID: u16 = 0x1FFF;
 pub enum Unpacked {
     Video {
         pid: u16,
+        random_access: Option<bool>, // can be None if adaptation_field is not present
         pts: Option<u64>,
         dts: Option<u64>,
         payload: Bytes,
     },
     Audio {
         pid: u16,
+        random_access: Option<bool>, // can be None if adaptation_field is not present
         pts: Option<u64>,
         payload: Bytes,
     },
@@ -58,18 +60,28 @@ impl std::fmt::Debug for Unpacked {
                 pts,
                 dts,
                 payload,
+                random_access,
             } => f
                 .debug_struct("Video")
                 .field("pid", &format_args!("0x{pid:02X}"))
                 .field("pts", pts)
                 .field("dts", dts)
+                .field("random_access", random_access)
                 .field("payload_len", &payload.len())
+                .field("payload_preview", &&payload[..payload.len().min(16)])
                 .finish(),
-            Unpacked::Audio { pid, pts, payload } => f
+            Unpacked::Audio {
+                pid,
+                pts,
+                payload,
+                random_access,
+            } => f
                 .debug_struct("Audio")
                 .field("pid", &format_args!("0x{pid:02X}"))
                 .field("pts", pts)
+                .field("random_access", random_access)
                 .field("payload_len", &payload.len())
+                .field("payload_preview", &&payload[..payload.len().min(16)])
                 .finish(),
             Unpacked::PMT(pmt) => write!(f, "PMT({pmt:?})"),
             Unpacked::PAT(pat) => write!(f, "PAT({pat:?})"),
@@ -132,7 +144,7 @@ fn parse_timestamp(data: &[u8]) -> Option<u64> {
 /// [8]     PES header data length
 /// [9..]   optional PTS/DTS, then ES payload
 /// ```
-fn unpack_pes(pid: u16, data: Bytes) -> Unpacked {
+fn unpack_pes(pid: u16, random_access_indicator: Option<bool>, data: Bytes) -> Unpacked {
     if data.len() < 9 {
         // Too short to be a valid PES — keep as raw PES
         let stream_id = if data.len() >= 4 { data[3] } else { 0 };
@@ -165,6 +177,7 @@ fn unpack_pes(pid: u16, data: Bytes) -> Unpacked {
     if (0xE0..=0xEF).contains(&stream_id) {
         return Unpacked::Video {
             pid,
+            random_access: random_access_indicator,
             pts,
             dts,
             payload,
@@ -173,7 +186,12 @@ fn unpack_pes(pid: u16, data: Bytes) -> Unpacked {
 
     // Audio stream IDs: 0xC0 – 0xDF
     if (0xC0..=0xDF).contains(&stream_id) {
-        return Unpacked::Audio { pid, pts, payload };
+        return Unpacked::Audio {
+            pid,
+            random_access: random_access_indicator,
+            pts,
+            payload,
+        };
     }
 
     // Other PES (e.g. private stream 1 = 0xBD, padding, etc.)
@@ -206,6 +224,7 @@ fn unpack_section(data: Bytes) -> Unpacked {
 struct PidBuffer {
     data: BytesMut,
     is_pes: bool,
+    random_access_indicator: Option<bool>,
 }
 
 /// Stream adapter that reassembles TS packets into complete PES packets and PSI sections.
@@ -245,7 +264,7 @@ where
         let data = buf.data.freeze();
         let item = if buf.is_pes {
             if data.len() >= 4 {
-                unpack_pes(pid, data)
+                unpack_pes(pid, buf.random_access_indicator, data)
             } else {
                 Unpacked::Private(data)
             }
@@ -280,7 +299,7 @@ where
         }
 
         let pusi = packet.header.payload_unit_start_indicator();
-        let payload = packet.payload;
+        let payload = &packet.payload;
 
         if pusi {
             // Detect PES: payload starts with start-code prefix 0x00 0x00 0x01
@@ -292,11 +311,16 @@ where
             if is_pes {
                 // Flush any previously accumulated data for this PID
                 self.flush_buffer(pid);
+                let random_access_indicator = packet
+                    .adaptation_field
+                    .as_ref()
+                    .map(|af| af.flags.random_access_indicator());
                 self.buffers.insert(
                     pid,
                     PidBuffer {
                         data: BytesMut::from(payload.as_ref()),
                         is_pes: true,
+                        random_access_indicator,
                     },
                 );
             } else {
@@ -318,6 +342,7 @@ where
                         PidBuffer {
                             data: BytesMut::from(&payload[start..]),
                             is_pes: false,
+                            random_access_indicator: None,
                         },
                     );
                 }
@@ -325,7 +350,7 @@ where
         } else {
             // Continuation packet — append to existing buffer, or discard if no PUSI seen yet
             if let Some(buf) = self.buffers.get_mut(&pid) {
-                buf.data.extend_from_slice(&payload);
+                buf.data.extend_from_slice(payload);
             }
         }
     }
@@ -673,6 +698,7 @@ mod tests {
                 pts,
                 dts,
                 payload,
+                ..
             } => {
                 assert_eq!(pid, 0x100);
                 assert_eq!(pts, Some(90000));
@@ -710,6 +736,7 @@ mod tests {
                 pts,
                 dts,
                 payload,
+                ..
             } => {
                 assert_eq!(pid, 0x100);
                 assert_eq!(pts, Some(90000));
@@ -736,7 +763,9 @@ mod tests {
         let mut decoder = UnpackedDecoder::new(stream);
         let item = decoder.next().await.unwrap().unwrap();
         match item {
-            Unpacked::Audio { pid, pts, payload } => {
+            Unpacked::Audio {
+                pid, pts, payload, ..
+            } => {
                 assert_eq!(pid, 0x200);
                 assert_eq!(pts, Some(90000));
                 assert_eq!(&payload[..], &[0x01, 0x02, 0x03]);
@@ -758,7 +787,9 @@ mod tests {
         let mut decoder = UnpackedDecoder::new(stream);
         let item = decoder.next().await.unwrap().unwrap();
         match item {
-            Unpacked::Audio { pid, pts, payload } => {
+            Unpacked::Audio {
+                pid, pts, payload, ..
+            } => {
                 assert_eq!(pid, 0x200);
                 assert!(pts.is_none());
                 assert_eq!(&payload[..], &[0xAA, 0xBB, 0xCC]);
