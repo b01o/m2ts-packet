@@ -1,4 +1,3 @@
-
 pub type Result<T> = std::result::Result<T, TsPacketError>;
 
 #[derive(Debug, thiserror::Error)]

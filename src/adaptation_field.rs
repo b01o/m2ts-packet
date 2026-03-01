@@ -1,5 +1,5 @@
-use bytes::Bytes;
 use bitfield_struct::bitfield;
+use bytes::Bytes;
 
 #[bitfield(u8, order = Msb)]
 pub struct AdaptationFieldFlags {
@@ -147,7 +147,6 @@ impl AdaptationField {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,7 +287,10 @@ mod tests {
         let flags = make_flags(false, false, false, false, false, false, true, false);
         let data = Bytes::from(vec![flags, 3, 0xAA, 0xBB, 0xCC]);
         let af = AdaptationField::from_bytes(data).unwrap();
-        assert_eq!(af.transport_private_data, Bytes::from_static(&[0xAA, 0xBB, 0xCC]));
+        assert_eq!(
+            af.transport_private_data,
+            Bytes::from_static(&[0xAA, 0xBB, 0xCC])
+        );
     }
 
     #[test]
@@ -296,7 +298,10 @@ mod tests {
         let flags = make_flags(false, false, false, false, false, false, false, true);
         let data = Bytes::from(vec![flags, 2, 0x01, 0x02]);
         let af = AdaptationField::from_bytes(data).unwrap();
-        assert_eq!(af.adaptation_field_extension, Bytes::from_static(&[0x01, 0x02]));
+        assert_eq!(
+            af.adaptation_field_extension,
+            Bytes::from_static(&[0x01, 0x02])
+        );
     }
 
     #[test]
@@ -322,7 +327,10 @@ mod tests {
         assert_eq!(af.original_program_clock_reference, Some(888 * 300 + 77));
         assert_eq!(af.splice_countdown, Some(10));
         assert_eq!(af.transport_private_data, Bytes::from_static(&[0xDE, 0xAD]));
-        assert_eq!(af.adaptation_field_extension, Bytes::from_static(&[0xBE, 0xEF]));
+        assert_eq!(
+            af.adaptation_field_extension,
+            Bytes::from_static(&[0xBE, 0xEF])
+        );
         assert!(af.flags.discontinuity_indicator());
         assert!(af.flags.random_access_indicator());
         assert!(af.flags.elementary_stream_priority_indicator());

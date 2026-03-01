@@ -36,9 +36,11 @@ impl TsPacket {
             if index + adaption_field_length > data.len() {
                 return None;
             }
-            let field_data = data.slice(index..index + adaption_field_length);
-            index += adaption_field_length;
-            adaption_field = Some(AdaptationField::from_bytes(field_data)?);
+            if adaption_field_length > 0 {
+                let field_data = data.slice(index..index + adaption_field_length);
+                index += adaption_field_length;
+                adaption_field = Some(AdaptationField::from_bytes(field_data)?);
+            }
         }
         Some(Self {
             header,

@@ -22,7 +22,6 @@ pub struct TransportStreamHeader {
     pub continuity_counter: u8,
 }
 
-
 #[derive(Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[bitenum]
