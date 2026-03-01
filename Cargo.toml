@@ -1,0 +1,17 @@
+[package]
+name = "ts-packet"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitfield-struct = "0.12.1"
+bytes = "1.11.1"
+thiserror = "2.0.18"
+tokio-stream = "0.1.18"
+tokio-util = { version = "0.7.18", features = ["codec"] }
+
+[dev-dependencies]
+tokio = { version = "1.28.0", features = ["full"] }
+
+
+
