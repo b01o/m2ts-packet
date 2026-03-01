@@ -171,9 +171,9 @@ mod tests {
     fn build_pmt_section(program_number: u16, pcr_pid: u16, streams: &[(u8, u16)]) -> Vec<u8> {
         let stream_bytes: usize = streams.len() * 5; // no descriptors
         let section_length = 9 + stream_bytes + 4; // 9 fixed after section_length + streams + CRC
-        let mut data = Vec::new();
-        // table_id
-        data.push(0x02);
+        let mut data = vec![
+            0x02, // table_id
+        ];
         // section_syntax_indicator(1)=1, '0'(1), reserved(2)=0b11, section_length(12)
         data.push(0xB0 | ((section_length >> 8) as u8 & 0x0F));
         data.push(section_length as u8);

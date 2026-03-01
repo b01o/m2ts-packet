@@ -99,9 +99,9 @@ mod tests {
     fn build_pat_section(ts_id: u16, entries: &[(u16, u16)]) -> Vec<u8> {
         let entry_bytes = entries.len() * 4;
         let section_length = 5 + entry_bytes + 4; // 5 fixed + entries + CRC
-        let mut data = Vec::new();
-        // table_id
-        data.push(0x00);
+        let mut data = vec![
+            0x00, // table_id
+        ];
         // section_syntax_indicator(1)=1, '0'(1), reserved(2)=0b11, section_length(12)
         data.push(0xB0 | ((section_length >> 8) as u8 & 0x0F));
         data.push(section_length as u8);

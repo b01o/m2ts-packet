@@ -19,7 +19,7 @@ pub struct AdaptationField {
     pub flags: AdaptationFieldFlags,
     /// 48 bit, Program clock reference, stored as 33 bits base, 6 bits reserved, 9 bits extension.  The value is calculated as base * 300 + extension.
     pub program_clock_reference: Option<u64>, // u48
-    /// 	48 bit, Original program clock reference, Helps when one TS is copied into another
+    /// 48 bit, Original program clock reference, Helps when one TS is copied into another
     pub original_program_clock_reference: Option<u64>, // u48
     pub splice_countdown: Option<u8>,
     // transport private data len: u8
@@ -151,6 +151,7 @@ impl AdaptationField {
 mod tests {
     use super::*;
 
+    #[allow(clippy::too_many_arguments)]
     /// Helper: build a flags byte from individual bits (MSB order).
     fn make_flags(
         discontinuity: bool,
