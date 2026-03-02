@@ -1,6 +1,6 @@
 [package]
 name = "m2ts-packet"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 authors     = ["b01o <b01o@proton.me>"]
 repository  = "https://github.com/b01o/m2ts-packet"
@@ -11,15 +11,15 @@ keywords = ["mpeg2", "ts", "mpeg2ts", "decoder", "parser"]
 categories = ["multimedia::encoding"]
 
 [dependencies]
-bitfield-struct = "0.12.1"
-bytes = "1.11.1"
-thiserror = "2.0.18"
-tokio = "1.28.0"
-tokio-stream = "0.1.18"
-tokio-util = { version = "0.7.18", features = ["codec"] }
+bitfield-struct = "0.12"
+bytes = "1.11"
+thiserror = "2.0"
+tokio = { version = "1.49", default-features = false, features = [] }
+tokio-util = { version = "0.7", features = ["codec"] }
+tokio-stream = "0.1"
 
 [dev-dependencies]
-tokio = { version = "1.28.0", features = ["full"] }
+tokio = { version = "1.49", features = ["full"] }
 remote-file = "0.2.0"
 reqwest = { version = "0.13", default-features = false, features = ["native-tls"] }
 anyhow = "1"
