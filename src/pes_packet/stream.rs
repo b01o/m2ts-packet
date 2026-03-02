@@ -1,8 +1,10 @@
+//! Stream adapter that reassembles TS packets into complete PES packets and PSI sections.
+
 use super::*;
 /// Stream adapter that reassembles TS packets into complete PES packets and PSI sections.
 ///
 /// Buffers payload data per-PID. When a new payload unit start indicator (PUSI) arrives,
-/// the previously buffered data for that PID is flushed as a complete [`Unpacked`] item.
+/// the previously buffered data for that PID is flushed as a complete [`PesPacket`] item.
 /// Continuation packets without a prior PUSI for their PID are discarded.
 pub struct PacketizedElementaryStream<S> {
     inner: S,
@@ -25,7 +27,7 @@ where
         }
     }
 
-    /// Remove the buffer for `pid` and push its contents as an [`Unpacked`] item to the
+    /// Remove the buffer for `pid` and push its contents as a [`PesPacket`] item to the
     /// pending queue. Does nothing if the buffer is empty or missing.
     fn flush_buffer(&mut self, pid: u16) {
         let Some(buf) = self.buffers.remove(&pid) else {
@@ -175,10 +177,10 @@ where
     }
 }
 
-pub trait TsPacketAssemble: Sized {
+pub trait TsPacketStreamAssemble: Sized {
     fn assemble(self) -> PacketizedElementaryStream<Self>;
 }
-impl<S> TsPacketAssemble for S
+impl<S> TsPacketStreamAssemble for S
 where
     S: Stream<Item = std::result::Result<(u64, TsPacket), TsPacketError>>,
     S: Unpin,

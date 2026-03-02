@@ -13,11 +13,11 @@ async fn main() {
     .await
     .unwrap();
     let mut ts_packets = FramedRead::new(&mut file, m2ts_packet::TsPacketDecoder::new(0));
-    let mut assembler = m2ts_packet::Assembler::new();
+    let mut assembler = m2ts_packet::PesAssembler::new();
 
     for _ in 0..10 {
         let next_packet = assembler
-            .next_unpacked(async || Ok(ts_packets.try_next().await?.map(|(_, pkt)| pkt)))
+            .next_packet(async || Ok(ts_packets.try_next().await?.map(|(_, pkt)| pkt)))
             .await
             .unwrap();
         println!("Packet: {:?}", next_packet);

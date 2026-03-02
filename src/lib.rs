@@ -1,22 +1,32 @@
-//! A MPEG2 Transport Stream (TS) packet decoder
+//! A MPEG2 Transport Stream (TS) packet decoder.
 //!
-//! ``` ignore
-//! #[tokio::main]
-//! async fn main() {
-//!     // replace with actual file
-//!     let mut file = tokio::fs::File::open("path/to/your/file.ts").await.unwrap();
-//!     let ts_packets = tokio_util::codec::FramedRead::new(&mut file, ts_packet::TsPacketDecoder::new(0));
-//!     let mut unpack = ts_packet::UnpackedDecoder::new(ts_packets);
-//!     let mut count = 0;
-//!     while let Some(unpacked) = unpack.try_next().await.unwrap() {
-//!         println!("Packet {count}: {:?}", unpacked);
-//!         count += 1;
-//!         if count >= 10 {
-//!             break;
-//!         }
-//!     }
-//! }
-//! ``````
+//! This crate provides low-level decoding of 188-byte MPEG-TS packets and
+//! reassembly into PES (Packetized Elementary Stream) packets and PSI sections
+//! (PAT / PMT).
+//!
+//! # Core types
+//!
+//! | Type | Description |
+//! |------|-------------|
+//! | [`TsPacket`] | A single 188-byte transport stream packet |
+//! | [`TsPacketDecoder`] | A [`tokio_util::codec::Decoder`] that reads `TsPacket`s from a byte stream |
+//! | [`PesPacket`] | A reassembled elementary stream item (video, audio, PAT, PMT, etc.) |
+//! | [`PacketizedElementaryStream`] | A `Stream` adapter that reassembles `TsPacket`s into `PesPacket`s |
+//! | [`PesAssembler`] | A pull-based assembler — same logic, but driven by an async callback |
+//!
+//! # Stream-based usage
+//!
+//! Wrap any `AsyncRead` source with [`TsPacketDecoder`] via `FramedRead`, then
+//! feed the packet stream into [`PacketizedElementaryStream`]:
+//!
+#![doc = concat!("```no_run\n", include_str!("../examples/stream.rs"), "\n```")]
+//!
+//! # Pull-based usage
+//!
+//! If you don't have a `Stream` or need finer control, use [`PesAssembler`]
+//! with an async callback that provides `TsPacket`s on demand:
+//!
+#![doc = concat!("```no_run\n", include_str!("../examples/assemble.rs"), "\n```")]
 
 use bitfield_struct::{bitenum, bitfield};
 use bytes::{Buf, Bytes, BytesMut};
@@ -33,5 +43,5 @@ mod adaptation_field;
 pub use ts_packet::{TsPacket, TsPacketDecoder};
 mod ts_packet;
 
-pub use unpacked::*;
-mod unpacked;
+pub use pes_packet::*;
+mod pes_packet;

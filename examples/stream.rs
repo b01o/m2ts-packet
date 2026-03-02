@@ -1,4 +1,4 @@
-use m2ts_packet::{TsPacketAssemble, TsPacketDecoder};
+use m2ts_packet::{TsPacketDecoder, TsPacketStreamAssemble};
 use remote_file::HttpFile;
 use tokio_stream::StreamExt;
 use tokio_util::codec::FramedRead;
