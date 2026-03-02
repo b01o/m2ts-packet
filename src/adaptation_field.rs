@@ -1,5 +1,5 @@
 use bitfield_struct::bitfield;
-use bytes::Bytes;
+use tokio_util::bytes::Bytes;
 
 #[bitfield(u8, order = Msb)]
 pub struct AdaptationFieldFlags {

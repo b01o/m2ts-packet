@@ -29,7 +29,7 @@
 #![doc = concat!("```no_run\n", include_str!("../examples/assemble.rs"), "\n```")]
 
 use bitfield_struct::{bitenum, bitfield};
-use bytes::{Buf, Bytes, BytesMut};
+use tokio_util::bytes::{Buf, Bytes, BytesMut};
 
 mod error;
 pub use error::*;

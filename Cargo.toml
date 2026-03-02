@@ -11,15 +11,13 @@ keywords = ["mpeg2", "ts", "mpeg2ts", "decoder", "parser"]
 categories = ["multimedia::encoding"]
 
 [dependencies]
+thiserror = "2"
 bitfield-struct = "0.12"
-bytes = "1.11"
-thiserror = "2.0"
-tokio = { version = "1.49", default-features = false, features = [] }
 tokio-util = { version = "0.7", features = ["codec"] }
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", default-features = false, features = [] }
 
 [dev-dependencies]
-tokio = { version = "1.49", features = ["full"] }
-remote-file = "0.2.0"
+tokio = { version = "1", features = ["full"] }
+remote-file = "0.2"
 reqwest = { version = "0.13", default-features = false, features = ["native-tls"] }
 anyhow = "1"

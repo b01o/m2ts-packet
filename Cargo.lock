@@ -540,7 +540,6 @@ version = "0.0.2"
 dependencies = [
  "anyhow",
  "bitfield-struct",
- "bytes",
  "remote-file",
  "reqwest",
  "thiserror",
