@@ -51,21 +51,55 @@ impl TsPacket {
 }
 
 /// Decoder that reads 188-byte MPEG-TS packets from a byte stream.
-pub struct TsPacketDecoder;
+pub struct TsPacketDecoder {
+    pub stream_position: u64,
+}
+
+impl TsPacketDecoder {
+    pub fn new(stream_position: u64) -> Self {
+        Self { stream_position }
+    }
+}
+
 impl Decoder for TsPacketDecoder {
-    type Item = TsPacket;
+    type Item = (u64, TsPacket);
     type Error = TsPacketError;
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>> {
-        // Scan for sync byte 0x47
-        while !src.is_empty() && src[0] != 0x47 {
-            src.advance(1);
-        }
         if src.len() < TsPacket::PACKET_SIZE {
             return Ok(None);
         }
+
+        // Scan for a valid sync byte: 0x47 at current position AND 0x47 at +PACKET_SIZE
+        // (or current position is at end-of-buffer, in which case we accept a single sync).
+        loop {
+            // Skip non-0x47 bytes
+            while !src.is_empty() && src[0] != 0x47 {
+                self.stream_position += 1;
+                src.advance(1);
+            }
+
+            if src.len() < TsPacket::PACKET_SIZE {
+                return Ok(None);
+            }
+
+            // Verify: the byte at +PACKET_SIZE should also be 0x47 (if data available),
+            // otherwise this 0x47 is likely a false positive.
+            if src.len() > TsPacket::PACKET_SIZE && src[TsPacket::PACKET_SIZE] != 0x47 {
+                // False sync — skip this byte and continue scanning
+                self.stream_position += 1;
+                src.advance(1);
+                continue;
+            }
+
+            break;
+        }
+
+        let position = self.stream_position;
+        self.stream_position += TsPacket::PACKET_SIZE as u64;
+
         let packet = TsPacket::from_bytes(src.split_to(TsPacket::PACKET_SIZE).freeze())
             .ok_or(TsPacketError::InvalidPacket)?;
-        Ok(Some(packet))
+        Ok(Some((position, packet)))
     }
 }
 
@@ -143,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_decoder_not_enough_data() {
-        let mut decoder = TsPacketDecoder;
+        let mut decoder = TsPacketDecoder::new(0);
         let mut buf = BytesMut::from(&[0x47u8; 100][..]);
         let result = decoder.decode(&mut buf).unwrap();
         assert!(result.is_none());
@@ -153,12 +187,13 @@ mod tests {
 
     #[test]
     fn test_decoder_exact_packet() {
-        let mut decoder = TsPacketDecoder;
+        let mut decoder = TsPacketDecoder::new(0);
         let pkt = make_packet(0x20, 5, 0x00);
         let mut buf = BytesMut::from(&pkt[..]);
         let result = decoder.decode(&mut buf).unwrap();
         assert!(result.is_some());
-        let ts = result.unwrap();
+        let (pos, ts) = result.unwrap();
+        assert_eq!(pos, 0);
         assert_eq!(ts.header.pid(), 0x20);
         assert_eq!(ts.header.continuity_counter(), 5);
         assert_eq!(buf.len(), 0);
@@ -166,39 +201,42 @@ mod tests {
 
     #[test]
     fn test_decoder_skips_garbage_before_sync() {
-        let mut decoder = TsPacketDecoder;
-        let pkt = make_packet(0x30, 7, 0xCC);
+        let mut decoder = TsPacketDecoder::new(0);
+        let pkt1 = make_packet(0x30, 7, 0xCC);
+        let pkt2 = make_packet(0x31, 0, 0x00);
         let mut buf = BytesMut::new();
         buf.extend_from_slice(&[0x00, 0xFF, 0xAA]); // 3 garbage bytes
-        buf.extend_from_slice(&pkt);
-        let result = decoder.decode(&mut buf).unwrap();
-        assert!(result.is_some());
-        let ts = result.unwrap();
+        buf.extend_from_slice(&pkt1);
+        buf.extend_from_slice(&pkt2); // needed so sync at pkt1 can be verified
+        let (pos, ts) = decoder.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(pos, 3); // skipped 3 garbage bytes
         assert_eq!(ts.header.pid(), 0x30);
-        assert_eq!(buf.len(), 0);
+        assert_eq!(buf.len(), 188); // pkt2 remains
     }
 
     #[test]
     fn test_decoder_two_packets_sequential() {
-        let mut decoder = TsPacketDecoder;
+        let mut decoder = TsPacketDecoder::new(0);
         let pkt1 = make_packet(0x100, 0, 0x11);
         let pkt2 = make_packet(0x200, 1, 0x22);
         let mut buf = BytesMut::new();
         buf.extend_from_slice(&pkt1);
         buf.extend_from_slice(&pkt2);
 
-        let ts1 = decoder.decode(&mut buf).unwrap().unwrap();
+        let (pos1, ts1) = decoder.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(pos1, 0);
         assert_eq!(ts1.header.pid(), 0x100);
         assert_eq!(buf.len(), 188);
 
-        let ts2 = decoder.decode(&mut buf).unwrap().unwrap();
+        let (pos2, ts2) = decoder.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(pos2, 188);
         assert_eq!(ts2.header.pid(), 0x200);
         assert_eq!(buf.len(), 0);
     }
 
     #[test]
     fn test_decoder_partial_then_complete() {
-        let mut decoder = TsPacketDecoder;
+        let mut decoder = TsPacketDecoder::new(0);
         let pkt = make_packet(0x42, 2, 0xDD);
         let mut buf = BytesMut::new();
 
@@ -208,15 +246,53 @@ mod tests {
 
         // Feed remaining
         buf.extend_from_slice(&pkt[100..]);
-        let ts = decoder.decode(&mut buf).unwrap().unwrap();
+        let (pos, ts) = decoder.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(pos, 0);
         assert_eq!(ts.header.pid(), 0x42);
         assert_eq!(buf.len(), 0);
     }
 
     #[test]
     fn test_decoder_empty_buffer() {
-        let mut decoder = TsPacketDecoder;
+        let mut decoder = TsPacketDecoder::new(0);
         let mut buf = BytesMut::new();
         assert!(decoder.decode(&mut buf).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_decoder_with_initial_stream_position() {
+        let mut decoder = TsPacketDecoder::new(1000);
+        let pkt1 = make_packet(0x50, 0, 0x00);
+        let pkt2 = make_packet(0x51, 1, 0x00);
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(&pkt1);
+        buf.extend_from_slice(&pkt2);
+
+        let (pos, ts) = decoder.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(pos, 1000);
+        assert_eq!(ts.header.pid(), 0x50);
+        assert_eq!(decoder.stream_position, 1188);
+    }
+
+    #[test]
+    fn test_decoder_false_sync_byte_skipped() {
+        // A 0x47 byte that does NOT have another 0x47 at +188 should be skipped.
+        let mut decoder = TsPacketDecoder::new(0);
+        let pkt = make_packet(0x60, 0, 0x00);
+        let mut buf = BytesMut::new();
+        // Put a false 0x47 followed by garbage, then a real packet pair
+        buf.extend_from_slice(&[0x47]); // false sync at offset 0
+        buf.extend_from_slice(&[0x00; 187]); // padding (total 188 so far)
+        buf.extend_from_slice(&[0x00]); // byte at 188 is NOT 0x47 → false sync
+        buf.extend_from_slice(&[0x00; 187]); // more padding
+        // Now at offset 376 place two real packets
+        let pkt2 = make_packet(0x61, 1, 0x00);
+        buf.extend_from_slice(&pkt);
+        buf.extend_from_slice(&pkt2);
+
+        let (pos, ts) = decoder.decode(&mut buf).unwrap().unwrap();
+        // Should have skipped past the false 0x47 and found the real packet
+        assert_eq!(pos, 376);
+        assert_eq!(ts.header.pid(), 0x60);
     }
 }

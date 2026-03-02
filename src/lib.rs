@@ -5,7 +5,7 @@
 //! async fn main() {
 //!     // replace with actual file
 //!     let mut file = tokio::fs::File::open("path/to/your/file.ts").await.unwrap();
-//!     let ts_packets = tokio_util::codec::FramedRead::new(&mut file, ts_packet::TsPacketDecoder);
+//!     let ts_packets = tokio_util::codec::FramedRead::new(&mut file, ts_packet::TsPacketDecoder::new(0));
 //!     let mut unpack = ts_packet::UnpackedDecoder::new(ts_packets);
 //!     let mut count = 0;
 //!     while let Some(unpacked) = unpack.try_next().await.unwrap() {
